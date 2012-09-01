@@ -183,10 +183,12 @@ class Zend_Cache_Backend_Sqlite3 extends Zend_Cache_Backend implements Zend_Cach
         } else {
             $expire = $mktime + $lifetime;
         }
+        $this->_query("BEGIN TRANSACTION");
         $this->_query("DELETE FROM cache WHERE id=?", array($id));
         $sql = "INSERT INTO cache (id, content, lastModified, expire) VALUES (?, ?, ?, ?)";
         $res = $this->_query($sql, array($id, $data, $mktime, $expire));
         if (!$res) {
+            $this->_query("ROLLBACK TRANSACTION");
             $this->_log("Zend_Cache_Backend_Sqlite::save() : impossible to store the cache id=$id");
             return false;
         }
@@ -194,6 +196,7 @@ class Zend_Cache_Backend_Sqlite3 extends Zend_Cache_Backend implements Zend_Cach
         foreach ($tags as $tag) {
             $res = $this->_registerTag($id, $tag) && $res;
         }
+        $this->_query("COMMIT TRANSACTION");
         return $res;
     }
 
@@ -528,6 +531,8 @@ class Zend_Cache_Backend_Sqlite3 extends Zend_Cache_Backend implements Zend_Cach
     
                     Zend_Cache::throwException("Impossible to open " . $this->_options['cache_db_complete_path'] . " cache DB file");
                 }
+                $this->_db->query("PRAGMA journal_mode=WAL");
+                $this->_db->query("PRAGMA synchronous=NORMAL");
                 return $this->_db;
             }
         } while (true);
