@@ -172,14 +172,15 @@ class Zend_Cache_Backend_Sqlite3 extends Zend_Cache_Backend implements Zend_Cach
         } else {
             $expire = $mktime + $lifetime;
         }
-
+        
+        $this->_db->beginTransaction();
         $this->_query("DELETE FROM cache WHERE id='$id'", true);
         $sql = "INSERT INTO cache (id, content, lastModified, expire) VALUES ('$id', ?, $mktime, $expire)";
 
         $res = $this->_query($sql, array($data));
 
         if (!$res) {
-        	die(print_R($this->_db->errorInfo()));
+            $this->_db->rollBack();
             $this->_log("Zend_Cache_Backend_Sqlite3::save() : impossible to store the cache id=$id");
             return false;
         }
@@ -189,6 +190,7 @@ class Zend_Cache_Backend_Sqlite3 extends Zend_Cache_Backend implements Zend_Cach
             $res = $this->_registerTag($id, $tag) && $res;
         }
 
+        $this->_db->commit();
         return $res;
 
     }
@@ -535,6 +537,9 @@ class Zend_Cache_Backend_Sqlite3 extends Zend_Cache_Backend implements Zend_Cach
     		try{
 
     			$this->_db = new PDO('sqlite:'.$this->_options['cache_db_complete_path']);
+                        $this->_db->query("PRAGMA journal_mode=WAL");
+                        $this->_db->query("PRAGMA synchronous=NORMAL");
+
 
     		}catch( PDOException $ex ){
 
